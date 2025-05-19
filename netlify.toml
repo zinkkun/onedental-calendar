@@ -1,0 +1,14 @@
+
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[[redirects]]
+  from = "/save_items"
+  to = "/.netlify/functions/save_items"
+  status = 200
+
+[[redirects]]
+  from = "/get_holidays"
+  to = "/.netlify/functions/get_holidays"
+  status = 200

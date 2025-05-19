@@ -1,0 +1,45 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>치과 제작 일정 달력</title>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body { font-family: Arial; margin: 0; padding: 0; }
+    #calendar { max-width: 100%; margin: 20px auto; padding: 10px; }
+    .zir { background-color: #586ff2; color: white; }
+    .fullzir { background-color: #f2a3f2; color: black; }
+    .holiday { background-color: #e74c3c; color: white; }
+    .login, #adminPanel {
+      max-width: 90%;
+      margin: 20px auto;
+      padding: 10px;
+    }
+    input, button {
+      width: 100%;
+      max-width: 300px;
+      padding: 8px;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="calendar">[캘린더 초기화 중...]</div>
+  <div id="adminPanel" style="display:none; border:1px solid #ccc">
+    <h3>항목 설정</h3>
+    <div id="itemsContainer"></div>
+    <button onclick="addItem()">+ 항목 추가</button>
+    <button onclick="saveItems()">저장</button>
+    <button onclick="downloadItems()">백업</button>
+  </div>
+  <div id="loginPanel" class="login" style="display:none;">
+    <input type="password" id="adminPassword" placeholder="관리자 비밀번호 입력" />
+    <button onclick="checkPassword()">확인</button>
+  </div>
+  <script src="assets/main.js"></script>
+</body>
+</html>
