@@ -26,8 +26,31 @@ document.addEventListener('DOMContentLoaded', async function() {
     initialView: 'dayGridMonth',
     locale: 'ko',
     dateClick: async function(info) {
+      const calendar = info.view.calendar;
       const result = await calculateProduction(info.date);
-      alert(`${info.dateStr} → 제작일 기준 계산:\n${result}`);
+
+      // 기존 표시 제거
+      calendar.getEvents().forEach(e => {
+        if (e.extendedProps.generated) e.remove();
+      });
+
+      // 줄 단위로 이벤트 추가
+      result.split('\n').forEach(line => {
+        const parts = line.split(": ");
+        if (parts.length === 2) {
+          const title = parts[0];
+          const dateStr = parts[1];
+          calendar.addEvent({
+            title: `[${title}] 제작일`,
+            start: dateStr,
+            display: 'block',
+            backgroundColor: '#e0e0e0',
+            borderColor: '#888',
+            textColor: '#000',
+            extendedProps: { generated: true }
+          });
+        }
+      });
     },
     events: await generateEvents()
   });
