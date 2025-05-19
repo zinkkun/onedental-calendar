@@ -1,9 +1,24 @@
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, setDoc, doc, getDocs, onSnapshot } from "firebase/firestore";
 
 const PASSWORD = "make1234";
 const urlParams = new URLSearchParams(window.location.search);
 const isAdmin = urlParams.get('admin') === '1';
 
 let holidays = [];
+
+// Firebase 설정 및 초기화
+const firebaseConfig = {
+  apiKey: "AIzaSyAmXQeQW8Yq_wTBddR7smgsVdQU_TgWVW0",
+  authDomain: "onedental-calendar.firebaseapp.com",
+  projectId: "onedental-calendar",
+  storageBucket: "onedental-calendar.firebasestorage.app",
+  messagingSenderId: "668196249825",
+  appId: "1:668196249825:web:298c052c05e8d8c02617a0",
+  measurementId: "G-957Z4V4NCN"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 document.addEventListener('DOMContentLoaded', async function() {
   console.log("📅 시작됨");
@@ -179,3 +194,29 @@ async function generateEvents(baseDate) {
 
   return events;
 }
+
+// 캘린더 항목 저장 함수
+function saveCalendarItem(item) {
+  // item: {date: "2024-06-10", title: "ZIR 제작", memo: "비고"}
+  db.collection("calendarItems").add(item)
+    .then(() => alert("저장 완료!"))
+    .catch((error) => alert("저장 실패: " + error));
+}
+
+// 캘린더 항목 실시간 구독 함수
+function subscribeCalendarItems(callback) {
+  db.collection("calendarItems").orderBy("date").onSnapshot(snapshot => {
+    const items = [];
+    snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+    callback(items);
+  });
+}
+
+// 예시: 저장
+// saveCalendarItem({date: "2024-06-10", title: "ZIR 제작", memo: "비고"});
+
+// 예시: 실시간 구독
+subscribeCalendarItems(function(items) {
+  console.log("실시간 캘린더 항목:", items);
+  // 여기서 화면에 캘린더를 갱신하면 됩니다
+});
