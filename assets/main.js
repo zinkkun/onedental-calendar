@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (e.extendedProps.generated) e.remove();
       });
 
-      // 줄 단위로 이벤트 추가
+      // 제작일 이벤트 추가
       result.split('\n').forEach(line => {
         const parts = line.split(": ");
         if (parts.length === 2) {
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
       });
     },
-    events: await generateEvents()
+    events: await generateEvents(new Date())  // 최초 렌더 시 기준: 오늘
   });
 
   calendar.render();
@@ -84,12 +84,11 @@ async function calculateProduction(baseDate) {
   return result.join('\n');
 }
 
-async function generateEvents() {
-  const today = new Date();
+async function generateEvents(baseDate) {
   const items = await loadItems();
   const events = [];
   for (const item of items) {
-    let date = new Date(today);
+    let date = new Date(baseDate);
     let count = 0;
     while (count < item.days) {
       date.setDate(date.getDate() + 1);
