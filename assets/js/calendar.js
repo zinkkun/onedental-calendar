@@ -6,8 +6,21 @@ let calendar;
 let holidays = [];
 
 // Firebase 컬렉션 참조
-const itemsCollection = db.collection('items');
-const holidaysCollection = db.collection('holidays');
+let db;
+let itemsCollection;
+let holidaysCollection;
+
+// Firebase 초기화
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    itemsCollection = db.collection('items');
+    holidaysCollection = db.collection('holidays');
+    console.log("✅ Firebase 초기화 성공");
+} catch (error) {
+    console.error("❌ Firebase 초기화 실패:", error);
+    alert("Firebase 연결에 실패했습니다. 페이지를 새로고침해주세요.");
+}
 
 // 공휴일 초기화 함수
 async function initializeHolidays() {
@@ -16,13 +29,17 @@ async function initializeHolidays() {
         const snapshot = await holidaysCollection.get();
         if (snapshot.empty) {
             // 공휴일 데이터가 없으면 추가
+            const batch = db.batch();
             for (const holiday of HOLIDAYS_2024) {
-                await holidaysCollection.add(holiday);
+                const docRef = holidaysCollection.doc();
+                batch.set(docRef, holiday);
             }
+            await batch.commit();
             console.log("✅ 공휴일 데이터 초기화 완료");
         }
     } catch (error) {
         console.error("❌ 공휴일 초기화 실패:", error);
+        throw error;
     }
 }
 
@@ -34,6 +51,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     try {
+        showLoading();
         // 공휴일 데이터 초기화
         await initializeHolidays();
         
@@ -41,12 +59,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         await loadHolidays();
         
         // 캘린더 초기화
-        initializeCalendar();
+        await initializeCalendar();
         
         // Firebase에서 실시간으로 항목 변경 감지
         subscribeToItems();
+        hideLoading();
     } catch (error) {
         console.error("❌ 초기화 실패:", error);
+        hideLoading();
+        alert("초기화에 실패했습니다. 페이지를 새로고침해주세요.");
     }
 });
 
@@ -224,6 +245,25 @@ async function removeItem(id, index) {
 async function saveItems() {
     try {
         showLoading();
+        // 입력값 검증
+        const divs = document.querySelectorAll("#itemsContainer div");
+        const items = [];
+        
+        for (let i = 0; i < divs.length; i++) {
+            const name = document.getElementById(`name_${i}`).value.trim();
+            const days = parseInt(document.getElementById(`days_${i}`).value);
+            const color = document.getElementById(`color_${i}`).value;
+            
+            if (!name) {
+                throw new Error("항목 이름을 입력해주세요.");
+            }
+            if (isNaN(days) || days <= 0) {
+                throw new Error("유효한 영업일을 입력해주세요.");
+            }
+            
+            items.push({ name, days, color });
+        }
+
         // 기존 항목 모두 삭제
         const snapshot = await itemsCollection.get();
         const batch = db.batch();
@@ -233,21 +273,15 @@ async function saveItems() {
         await batch.commit();
 
         // 새 항목 추가
-        const divs = document.querySelectorAll("#itemsContainer div");
-        for (let i = 0; i < divs.length; i++) {
-            const name = document.getElementById(`name_${i}`).value;
-            const days = parseInt(document.getElementById(`days_${i}`).value);
-            const color = document.getElementById(`color_${i}`).value;
-            
-            if (name && !isNaN(days)) {
-                await itemsCollection.add({
-                    name,
-                    days,
-                    color,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            }
+        const addBatch = db.batch();
+        for (const item of items) {
+            const docRef = itemsCollection.doc();
+            addBatch.set(docRef, {
+                ...item,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
         }
+        await addBatch.commit();
         
         hideLoading();
         alert("저장 완료!");
