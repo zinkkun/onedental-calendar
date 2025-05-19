@@ -29,12 +29,10 @@ document.addEventListener('DOMContentLoaded', async function() {
       const calendar = info.view.calendar;
       const result = await calculateProduction(info.date);
 
-      // 기존 표시 제거
       calendar.getEvents().forEach(e => {
         if (e.extendedProps.generated) e.remove();
       });
 
-      // 제작일 이벤트 추가
       result.split('\n').forEach(line => {
         const parts = line.split(": ");
         if (parts.length === 2) {
@@ -52,11 +50,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
       });
     },
-    events: await generateEvents(new Date())  // 최초 렌더 시 기준: 오늘
+    events: await generateEvents(new Date())
   });
 
   calendar.render();
 });
+
+function checkPassword() {
+  const input = document.getElementById("adminPassword").value;
+  if (input === PASSWORD) {
+    document.getElementById("adminPanel").style.display = 'block';
+    document.getElementById("loginPanel").style.display = 'none';
+    loadItemsForEdit();
+  } else {
+    alert("비밀번호가 틀렸습니다.");
+  }
+}
 
 function isHolidayOrWeekend(date) {
   const iso = date.toISOString().slice(0, 10);
@@ -67,6 +76,73 @@ function isHolidayOrWeekend(date) {
 async function loadItems() {
   const res = await fetch("config/items.json");
   return await res.json();
+}
+
+async function loadItemsForEdit() {
+  const res = await fetch("config/items.json");
+  const items = await res.json();
+  const container = document.getElementById("itemsContainer");
+  container.innerHTML = '';
+  items.forEach((item, index) => {
+    container.innerHTML += `
+      <div>
+        이름: <input value="${item.name}" id="name_${index}">
+        영업일: <input type="number" value="${item.days}" id="days_${index}">
+        색상: <input type="color" value="${item.color}" id="color_${index}">
+        <button onclick="removeItem(${index})">삭제</button>
+      </div>
+    `;
+  });
+}
+
+function addItem() {
+  const container = document.getElementById("itemsContainer");
+  const index = document.querySelectorAll("#itemsContainer div").length;
+  container.innerHTML += `
+    <div>
+      이름: <input id="name_${index}">
+      영업일: <input type="number" id="days_${index}">
+      색상: <input type="color" id="color_${index}" value="#cccccc">
+      <button onclick="removeItem(${index})">삭제</button>
+    </div>
+  `;
+}
+
+function removeItem(index) {
+  const divs = document.querySelectorAll("#itemsContainer div");
+  if (divs[index]) divs[index].remove();
+}
+
+function saveItems() {
+  const items = [];
+  const divs = document.querySelectorAll("#itemsContainer div");
+  divs.forEach((div, i) => {
+    const name = document.getElementById(`name_${i}`).value;
+    const days = parseInt(document.getElementById(`days_${i}`).value);
+    const color = document.getElementById(`color_${i}`).value;
+    if (name && !isNaN(days)) {
+      items.push({ name, days, color });
+    }
+  });
+  fetch('/save_items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(items)
+  }).then(() => alert("저장 완료!"));
+}
+
+function downloadItems() {
+  fetch('config/items.json')
+    .then(res => res.json())
+    .then(data => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'items_backup.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
 }
 
 async function calculateProduction(baseDate) {
