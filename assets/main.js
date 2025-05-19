@@ -35,4 +35,49 @@ document.addEventListener('DOMContentLoaded', async function() {
   calendar.render();
 });
 
-// 나머지 함수들은 생략 — 원래 main.js 내부와 동일하게 구성되어야 함
+function isHolidayOrWeekend(date) {
+  const iso = date.toISOString().slice(0, 10);
+  const day = date.getDay();
+  return holidays.includes(iso) || day === 0 || day === 6;
+}
+
+async function loadItems() {
+  const res = await fetch("config/items.json");
+  return await res.json();
+}
+
+async function calculateProduction(baseDate) {
+  const items = await loadItems();
+  const result = [];
+  for (const item of items) {
+    let count = 0;
+    let tempDate = new Date(baseDate);
+    while (count < item.days) {
+      tempDate.setDate(tempDate.getDate() + 1);
+      if (!isHolidayOrWeekend(tempDate)) count++;
+    }
+    result.push(`${item.name}: ${tempDate.toISOString().slice(0, 10)}`);
+  }
+  return result.join('\n');
+}
+
+async function generateEvents() {
+  const today = new Date();
+  const items = await loadItems();
+  const events = [];
+  for (const item of items) {
+    let date = new Date(today);
+    let count = 0;
+    while (count < item.days) {
+      date.setDate(date.getDate() + 1);
+      if (!isHolidayOrWeekend(date)) count++;
+    }
+    events.push({ title: item.name, start: date.toISOString().slice(0, 10), color: item.color });
+  }
+
+  for (const h of holidays) {
+    events.push({ title: "공휴일", start: h, display: 'background', className: "holiday" });
+  }
+
+  return events;
+}
