@@ -7,9 +7,6 @@
   <!-- FullCalendar -->
   <link href="assets/lib/fullcalendar.min.css" rel="stylesheet" />
   <script src="assets/lib/fullcalendar.min.js"></script>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   <!-- 설정 파일 -->
   <script src="assets/js/config.js"></script>
   <style>
@@ -202,16 +199,98 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    .admin-section {
+      background: #fff;
+      padding: 20px;
+      margin: 10px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .admin-section h4 {
+      margin: 0 0 15px 0;
+      color: #333;
+    }
+    .vacation-input {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .vacation-input input {
+      flex: 1;
+    }
+    #vacationList {
+      margin-top: 10px;
+    }
+    .vacation-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      background: #f8f9fa;
+      margin: 5px 0;
+      border-radius: 4px;
+    }
+    .vacation-item button {
+      padding: 4px 8px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #holidayList {
+      margin-top: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .holiday-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
   </style>
 </head>
 <body>
   <div id="calendar"></div>
   <div id="adminPanel" style="display:none;">
-    <h3>항목 설정</h3>
-    <div id="itemsContainer"></div>
-    <button id="addItemButton">+ 항목 추가</button>
-    <button id="saveButton">저장</button>
+    <h3>관리자 설정</h3>
+    
+    <!-- 제작 항목 설정 -->
+    <div class="admin-section">
+      <h4>제작 항목 설정</h4>
+      <div id="itemsContainer"></div>
+      <button id="addItemButton">+ 항목 추가</button>
+      <button id="saveItemsButton">저장</button>
+    </div>
+
+    <!-- 휴가 일정 관리 -->
+    <div class="admin-section">
+      <h4>휴가 일정 관리</h4>
+      <div id="vacationContainer">
+        <div class="vacation-input">
+          <input type="date" id="vacationStart" placeholder="시작일">
+          <input type="date" id="vacationEnd" placeholder="종료일">
+          <input type="text" id="vacationDesc" placeholder="휴가 설명 (예: 여름휴가)">
+          <button id="addVacationButton">추가</button>
+        </div>
+        <div id="vacationList">
+          <!-- 휴가 목록이 여기에 표시됩니다 -->
+        </div>
+      </div>
+      <button id="saveVacationButton">저장</button>
+    </div>
+
+    <!-- 공휴일 관리 -->
+    <div class="admin-section">
+      <h4>공휴일 관리</h4>
+      <button id="updateHolidaysButton">공휴일 업데이트</button>
+      <div id="holidayList">
+        <!-- 공휴일 목록이 여기에 표시됩니다 -->
+      </div>
+    </div>
   </div>
+
   <div id="loginPanel" class="login" style="display:none;">
     <input type="password" id="adminPassword" placeholder="관리자 비밀번호 입력" />
     <button onclick="checkPassword()">확인</button>
@@ -219,20 +298,6 @@
   <div id="loading" class="loading" style="display:none;">
     <div class="loading-spinner"></div>
   </div>
-
-  <!-- Firebase 초기화 -->
-  <script>
-    // Firebase 초기화
-    try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      window.db = firebase.apps[0].firestore();
-      console.log("✅ Firebase 초기화 성공");
-    } catch (error) {
-      console.error("❌ Firebase 초기화 실패:", error);
-    }
-  </script>
 
   <!-- 메인 스크립트 -->
   <script src="assets/js/calendar.js"></script>

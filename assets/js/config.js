@@ -9,6 +9,12 @@ const firebaseConfig = {
     measurementId: "G-957Z4V4NCN"
 };
 
+// 공휴일 API 설정
+const HOLIDAY_API_CONFIG = {
+    key: "Odn5P4fvXa%2Fhed175UJOP2MxbRubv5HMTtXmg2D3Nr1emNh5fuVKfs3%2FCaqBt2D%2F9zu1J7w1KFOf9u%2BIsRkbOQ%3D%3D",
+    url: "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo"
+};
+
 // 관리자 비밀번호 (실제 운영시에는 서버에서 관리하는 것이 좋습니다)
 const ADMIN_PASSWORD = "make1234";
 

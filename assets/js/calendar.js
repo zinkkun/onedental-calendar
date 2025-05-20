@@ -309,16 +309,89 @@ function isHolidayOrWeekend(date) {
 // 공휴일 로드
 async function loadHolidays() {
     try {
-        const snapshot = await holidaysCollection.get();
-        holidays = [];
-        snapshot.forEach(doc => {
-            holidays.push(doc.data().date);
-        });
-        console.log("✅ 공휴일 목록 로드 완료:", holidays);
+        // 캐시된 공휴일 데이터 확인
+        const cachedHolidays = localStorage.getItem('holidays');
+        const lastUpdate = localStorage.getItem('holidaysLastUpdate');
+        const now = new Date().getTime();
+
+        // 캐시가 24시간 이내인 경우 사용
+        if (cachedHolidays && lastUpdate && (now - parseInt(lastUpdate)) < 24 * 60 * 60 * 1000) {
+            this.holidays = new Set(JSON.parse(cachedHolidays));
+            this.renderHolidayList();
+            return;
+        }
+
+        // 현재 연도의 공휴일 데이터 가져오기
+        const year = new Date().getFullYear();
+        const holidays = await this.fetchHolidays(year);
+        
+        if (holidays && holidays.length > 0) {
+            this.holidays = new Set(holidays.map(h => h.date));
+            
+            // 캐시 저장
+            localStorage.setItem('holidays', JSON.stringify([...this.holidays]));
+            localStorage.setItem('holidaysLastUpdate', now.toString());
+            
+            // 공휴일 목록 업데이트
+            this.renderHolidayList();
+        } else {
+            // API 호출 실패시 기본 데이터 사용
+            console.warn("API 호출 실패, 기본 공휴일 데이터 사용");
+            this.holidays = new Set(HOLIDAYS_2024.map(h => h.date));
+        }
+
     } catch (error) {
-        console.error("❌ 공휴일 로딩 실패:", error);
-        holidays = [];
+        console.error("❌ 공휴일 데이터 로드 실패:", error);
+        // 오류 시 기본 공휴일 데이터 사용
+        this.holidays = new Set(HOLIDAYS_2024.map(h => h.date));
     }
+    this.render();
+}
+
+async fetchHolidays(year) {
+    try {
+        const params = new URLSearchParams({
+            ServiceKey: HOLIDAY_API_CONFIG.key,
+            solYear: year,
+            _type: 'json',
+            numOfRows: 100
+        });
+
+        const response = await fetch(`${HOLIDAY_API_CONFIG.url}?${params}`);
+        const data = await response.json();
+
+        if (data.response.body.items.item) {
+            return data.response.body.items.item.map(item => ({
+                date: `${item.locdate}`.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+                name: item.dateName
+            }));
+        }
+        return null;
+    } catch (error) {
+        console.error("❌ 공휴일 API 호출 실패:", error);
+        return null;
+    }
+}
+
+renderHolidayList() {
+    const container = document.getElementById('holidayList');
+    if (!container) return;
+
+    const sortedHolidays = [...this.holidays].sort();
+    let html = '';
+    
+    // API에서 가져온 공휴일 데이터 표시
+    sortedHolidays.forEach(date => {
+        const holiday = HOLIDAYS_2024.find(h => h.date === date);
+        html += `
+            <div class="holiday-item">
+                <span>${date}</span>
+                <span>${holiday ? holiday.name : '공휴일'}</span>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
 }
 
 // 제작일 계산
@@ -423,66 +496,125 @@ class Calendar {
         this.date = new Date();
         this.events = new Map();
         this.holidays = new Set();
+        this.vacations = new Map();
         this.memos = new Map();
         this.selectedDate = new Date();
         this.items = [];
         
-        // Firebase 컬렉션 참조
-        try {
-            if (!window.db) {
-                throw new Error("Firebase가 초기화되지 않았습니다.");
-            }
-            this.db = window.db;
-            this.itemsCollection = this.db.collection('items');
-            this.holidaysCollection = this.db.collection('holidays');
-            console.log("✅ Firebase 컬렉션 참조 성공");
-            
-            // 데이터 로드
-            this.initializeData();
-        } catch (error) {
-            console.error("❌ Firebase 컬렉션 참조 실패:", error);
-            alert("Firebase 연결에 실패했습니다. 페이지를 새로고침해주세요.");
-        }
-
+        // 로컬 데이터 로드
+        this.loadLocalData();
+        
+        // 공휴일 API 데이터 로드
+        this.loadHolidays();
+        
         this.render();
         this.setupEventListeners();
     }
 
-    async initializeData() {
+    loadLocalData() {
         try {
-            await Promise.all([
-                this.loadItems(),
-                this.loadHolidays()
-            ]);
-        } catch (error) {
-            console.error("❌ 데이터 로드 실패:", error);
-        }
-    }
+            // 제작 항목 로드
+            const savedItems = localStorage.getItem('productionItems');
+            this.items = savedItems ? JSON.parse(savedItems) : [];
 
-    async loadItems() {
-        try {
-            const snapshot = await this.itemsCollection.get();
-            this.items = [];
-            snapshot.forEach(doc => {
-                this.items.push({ id: doc.id, ...doc.data() });
-            });
-            this.render();
+            // 휴가 일정 로드
+            const savedVacations = localStorage.getItem('vacations');
+            this.vacations = new Map(savedVacations ? JSON.parse(savedVacations) : []);
+
+            // 메모 로드
+            const savedMemos = localStorage.getItem('memos');
+            this.memos = new Map(savedMemos ? JSON.parse(savedMemos) : []);
+
         } catch (error) {
-            console.error("❌ 항목 로드 실패:", error);
+            console.error("❌ 로컬 데이터 로드 실패:", error);
         }
     }
 
     async loadHolidays() {
         try {
-            const snapshot = await this.holidaysCollection.get();
-            this.holidays.clear();
-            snapshot.forEach(doc => {
-                this.holidays.add(doc.data().date);
-            });
-            this.render();
+            // 캐시된 공휴일 데이터 확인
+            const cachedHolidays = localStorage.getItem('holidays');
+            const lastUpdate = localStorage.getItem('holidaysLastUpdate');
+            const now = new Date().getTime();
+
+            // 캐시가 24시간 이내인 경우 사용
+            if (cachedHolidays && lastUpdate && (now - parseInt(lastUpdate)) < 24 * 60 * 60 * 1000) {
+                this.holidays = new Set(JSON.parse(cachedHolidays));
+                this.renderHolidayList();
+                return;
+            }
+
+            // 현재 연도의 공휴일 데이터 가져오기
+            const year = new Date().getFullYear();
+            const holidays = await this.fetchHolidays(year);
+            
+            if (holidays && holidays.length > 0) {
+                this.holidays = new Set(holidays.map(h => h.date));
+                
+                // 캐시 저장
+                localStorage.setItem('holidays', JSON.stringify([...this.holidays]));
+                localStorage.setItem('holidaysLastUpdate', now.toString());
+                
+                // 공휴일 목록 업데이트
+                this.renderHolidayList();
+            } else {
+                // API 호출 실패시 기본 데이터 사용
+                console.warn("API 호출 실패, 기본 공휴일 데이터 사용");
+                this.holidays = new Set(HOLIDAYS_2024.map(h => h.date));
+            }
+
         } catch (error) {
-            console.error("❌ 공휴일 로드 실패:", error);
+            console.error("❌ 공휴일 데이터 로드 실패:", error);
+            // 오류 시 기본 공휴일 데이터 사용
+            this.holidays = new Set(HOLIDAYS_2024.map(h => h.date));
         }
+        this.render();
+    }
+
+    async fetchHolidays(year) {
+        try {
+            const params = new URLSearchParams({
+                ServiceKey: HOLIDAY_API_CONFIG.key,
+                solYear: year,
+                _type: 'json',
+                numOfRows: 100
+            });
+
+            const response = await fetch(`${HOLIDAY_API_CONFIG.url}?${params}`);
+            const data = await response.json();
+
+            if (data.response.body.items.item) {
+                return data.response.body.items.item.map(item => ({
+                    date: `${item.locdate}`.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+                    name: item.dateName
+                }));
+            }
+            return null;
+        } catch (error) {
+            console.error("❌ 공휴일 API 호출 실패:", error);
+            return null;
+        }
+    }
+
+    renderHolidayList() {
+        const container = document.getElementById('holidayList');
+        if (!container) return;
+
+        const sortedHolidays = [...this.holidays].sort();
+        let html = '';
+        
+        // API에서 가져온 공휴일 데이터 표시
+        sortedHolidays.forEach(date => {
+            const holiday = HOLIDAYS_2024.find(h => h.date === date);
+            html += `
+                <div class="holiday-item">
+                    <span>${date}</span>
+                    <span>${holiday ? holiday.name : '공휴일'}</span>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
     }
 
     setupEventListeners() {
@@ -500,6 +632,21 @@ class Calendar {
             const saveButton = document.getElementById('saveButton');
             if (addButton) addButton.addEventListener('click', () => this.addItem());
             if (saveButton) saveButton.addEventListener('click', () => this.saveItems());
+
+            // 휴가 관리
+            const addVacationBtn = document.getElementById('addVacationButton');
+            const saveVacationBtn = document.getElementById('saveVacationButton');
+            const updateHolidaysBtn = document.getElementById('updateHolidaysButton');
+
+            if (addVacationBtn) {
+                addVacationBtn.addEventListener('click', () => this.addVacation());
+            }
+            if (saveVacationBtn) {
+                saveVacationBtn.addEventListener('click', () => this.saveVacations());
+            }
+            if (updateHolidaysBtn) {
+                updateHolidaysBtn.addEventListener('click', () => this.updateHolidays());
+            }
         }
     }
 
@@ -739,6 +886,72 @@ class Calendar {
         } catch (error) {
             console.error("❌ 저장 실패:", error);
             alert("저장 실패: " + error.message);
+        }
+    }
+
+    addVacation() {
+        const startDate = document.getElementById('vacationStart').value;
+        const endDate = document.getElementById('vacationEnd').value;
+        const desc = document.getElementById('vacationDesc').value;
+
+        if (!startDate || !endDate || !desc) {
+            alert('모든 필드를 입력해주세요.');
+            return;
+        }
+
+        const vacation = {
+            start: startDate,
+            end: endDate,
+            description: desc
+        };
+
+        const id = Date.now().toString();
+        this.vacations.set(id, vacation);
+        this.renderVacationList();
+        this.render();
+    }
+
+    removeVacation(id) {
+        this.vacations.delete(id);
+        this.renderVacationList();
+        this.render();
+    }
+
+    saveVacations() {
+        try {
+            localStorage.setItem('vacations', JSON.stringify([...this.vacations]));
+            alert('휴가 일정이 저장되었습니다.');
+        } catch (error) {
+            console.error("❌ 휴가 일정 저장 실패:", error);
+            alert('휴가 일정 저장에 실패했습니다.');
+        }
+    }
+
+    renderVacationList() {
+        const container = document.getElementById('vacationList');
+        if (!container) return;
+
+        let html = '';
+        this.vacations.forEach((vacation, id) => {
+            html += `
+                <div class="vacation-item">
+                    <span>${vacation.start} ~ ${vacation.end}: ${vacation.description}</span>
+                    <button onclick="calendar.removeVacation('${id}')">삭제</button>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    async updateHolidays() {
+        try {
+            // TODO: 공공데이터포털 API 호출
+            await this.loadHolidays();
+            this.renderHolidayList();
+            alert('공휴일 정보가 업데이트되었습니다.');
+        } catch (error) {
+            console.error("❌ 공휴일 업데이트 실패:", error);
+            alert('공휴일 업데이트에 실패했습니다.');
         }
     }
 }
