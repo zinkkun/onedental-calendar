@@ -4,7 +4,7 @@ export const ADMIN_PASSWORD = "make1234";
 // 공휴일 API 설정
 export const HOLIDAY_API_CONFIG = {
     key: "Odn5P4fvXa%2Fhed175UJOP2MxbRubv5HMTtXmg2D3Nr1emNh5fuVKfs3%2FCaqBt2D%2F9zu1J7w1KFOf9u%2BIsRkbOQ%3D%3D",
-    url: "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo"
+    url: "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo"
 };
 
 // 기본 공휴일 데이터
