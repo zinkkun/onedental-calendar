@@ -427,17 +427,16 @@ class Calendar {
         this.selectedDate = new Date();
         this.items = [];
         
-        // Firebase 초기화
+        // Firebase 컬렉션 참조
         try {
-            firebase.initializeApp(firebaseConfig);
             this.db = firebase.firestore();
             this.itemsCollection = this.db.collection('items');
             this.holidaysCollection = this.db.collection('holidays');
-            console.log("✅ Firebase 초기화 성공");
+            console.log("✅ Firebase 컬렉션 참조 성공");
             this.loadItems();
             this.loadHolidays();
         } catch (error) {
-            console.error("❌ Firebase 초기화 실패:", error);
+            console.error("❌ Firebase 컬렉션 참조 실패:", error);
             alert("Firebase 연결에 실패했습니다. 페이지를 새로고침해주세요.");
         }
 
