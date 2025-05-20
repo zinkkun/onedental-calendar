@@ -6,9 +6,9 @@ let calendar;
 let holidays = [];
 
 // Firebase 컬렉션 참조
-let db;
 let itemsCollection;
 let holidaysCollection;
+let db;
 
 // Firebase 초기화
 try {
