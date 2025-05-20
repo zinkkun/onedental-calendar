@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>원덴탈 제작 일정</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="calendar"></div>
+
+    <!-- 관리자 로그인 패널 -->
+    <div id="loginPanel" style="display: none;">
+        <input type="password" id="adminPassword" placeholder="관리자 비밀번호">
+        <button onclick="checkPassword()">로그인</button>
+    </div>
+
+    <!-- 관리자 패널 -->
+    <div id="adminPanel" style="display: none;">
+        <h3>제작 항목 관리</h3>
+        <div id="itemsContainer"></div>
+        <button onclick="addItem()">항목 추가</button>
+        <button onclick="saveItems()">저장</button>
+
+        <h3>휴가 관리</h3>
+        <div>
+            <input type="date" id="vacationStart">
+            <input type="date" id="vacationEnd">
+            <input type="text" id="vacationDesc" placeholder="휴가 설명">
+            <button onclick="addVacation()">추가</button>
+        </div>
+        <div id="vacationList"></div>
+    </div>
+
+    <!-- 로딩 표시 -->
+    <div id="loading" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <script type="module" src="js/index.js"></script>
+</body>
+</html> 
