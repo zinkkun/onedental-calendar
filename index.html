@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>치과 제작 일정 달력</title>
   <!-- FullCalendar -->
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
+  <link href="assets/lib/fullcalendar.min.css" rel="stylesheet" />
+  <script src="assets/lib/fullcalendar.min.js"></script>
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -29,29 +29,92 @@
       border-radius: 10px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    .fc-event {
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .calendar-header button {
+      background: #586ff2;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
       cursor: pointer;
-      transition: transform 0.2s;
-      padding: 2px 4px;
+      font-size: 16px;
+    }
+    .calendar-header h2 {
+      margin: 0;
+      font-size: 1.5em;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      background: #eee;
+      padding: 1px;
+      border-radius: 5px;
+    }
+    .weekday {
+      background: #586ff2;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .calendar-cell {
+      background: white;
+      min-height: 100px;
+      padding: 5px;
+      position: relative;
+      cursor: pointer;
+    }
+    .calendar-cell:hover {
+      background: #f8f9fa;
+    }
+    .calendar-cell .date {
+      position: absolute;
+      top: 5px;
+      right: 5px;
       font-size: 0.9em;
+      color: #666;
     }
-    .fc-event:hover {
-      transform: scale(1.02);
+    .calendar-cell.today {
+      background: #e3f2fd;
     }
-    .zir { 
-      background-color: #586ff2; 
-      color: white; 
-      border: none;
+    .calendar-cell.selected {
+      background: #bbdefb;
     }
-    .fullzir { 
-      background-color: #f2a3f2; 
-      color: black; 
-      border: none;
+    .calendar-cell.holiday .date {
+      color: #e74c3c;
     }
-    .holiday { 
-      background-color: #e74c3c; 
-      color: white; 
-      border: none;
+    .calendar-cell.prev-month,
+    .calendar-cell.next-month {
+      background: #f8f9fa;
+    }
+    .calendar-cell.prev-month .date,
+    .calendar-cell.next-month .date {
+      color: #aaa;
+    }
+    .event {
+      margin-top: 25px;
+      padding: 4px 6px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .memo {
+      margin-top: 2px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
     }
     .login, #adminPanel {
       width: 100%;
@@ -69,7 +132,7 @@
       margin: 5px 0;
       border: 1px solid #ddd;
       border-radius: 5px;
-      font-size: 16px; /* iOS에서 자동 확대 방지 */
+      font-size: 16px;
     }
     button {
       background: #586ff2;
@@ -99,32 +162,19 @@
         padding: 5px;
         margin: 5px auto;
       }
-      .fc-toolbar {
-        flex-direction: column;
-        gap: 10px;
+      .calendar-header h2 {
+        font-size: 1.2em;
       }
-      .fc-toolbar-title {
-        font-size: 1.2em !important;
+      .calendar-cell {
+        min-height: 60px;
       }
-      .fc-button {
-        padding: 8px !important;
-        font-size: 0.9em !important;
-      }
-      .fc-event {
-        font-size: 0.8em;
+      .event {
+        font-size: 0.7em;
+        padding: 2px 4px;
       }
       input, button {
         padding: 10px;
-        font-size: 16px;
-      }
-      #itemsContainer > div {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-      }
-      #itemsContainer input {
-        width: 100%;
-        max-width: none;
+        font-size: 14px;
       }
     }
     /* 로딩 인디케이터 */
@@ -155,13 +205,12 @@
   </style>
 </head>
 <body>
-  <div id="calendar">[캘린더 초기화 중...]</div>
+  <div id="calendar"></div>
   <div id="adminPanel" style="display:none;">
     <h3>항목 설정</h3>
     <div id="itemsContainer"></div>
-    <button onclick="addItem()">+ 항목 추가</button>
-    <button onclick="saveItems()">저장</button>
-    <button onclick="downloadItems()">백업</button>
+    <button id="addItemButton">+ 항목 추가</button>
+    <button id="saveButton">저장</button>
   </div>
   <div id="loginPanel" class="login" style="display:none;">
     <input type="password" id="adminPassword" placeholder="관리자 비밀번호 입력" />
@@ -170,13 +219,6 @@
   <div id="loading" class="loading" style="display:none;">
     <div class="loading-spinner"></div>
   </div>
-
-  <!-- Firebase 초기화 -->
-  <script>
-    // Firebase 초기화
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-  </script>
 
   <!-- 메인 스크립트 -->
   <script src="assets/js/calendar.js"></script>

@@ -414,4 +414,322 @@ async function downloadItems() {
         console.error("❌ 백업 다운로드 실패:", error);
         alert("백업 실패: " + error.message);
     }
-} 
+}
+
+// Calendar 클래스 정의
+class Calendar {
+    constructor(container) {
+        this.container = container;
+        this.date = new Date();
+        this.events = new Map();
+        this.holidays = new Set();
+        this.memos = new Map();
+        this.selectedDate = new Date();
+        this.items = [];
+        
+        // Firebase 초기화
+        try {
+            firebase.initializeApp(firebaseConfig);
+            this.db = firebase.firestore();
+            this.itemsCollection = this.db.collection('items');
+            this.holidaysCollection = this.db.collection('holidays');
+            console.log("✅ Firebase 초기화 성공");
+            this.loadItems();
+            this.loadHolidays();
+        } catch (error) {
+            console.error("❌ Firebase 초기화 실패:", error);
+            alert("Firebase 연결에 실패했습니다. 페이지를 새로고침해주세요.");
+        }
+
+        this.render();
+        this.setupEventListeners();
+    }
+
+    async loadItems() {
+        try {
+            const snapshot = await this.itemsCollection.get();
+            this.items = [];
+            snapshot.forEach(doc => {
+                this.items.push({ id: doc.id, ...doc.data() });
+            });
+            this.render();
+        } catch (error) {
+            console.error("❌ 항목 로드 실패:", error);
+        }
+    }
+
+    async loadHolidays() {
+        try {
+            const snapshot = await this.holidaysCollection.get();
+            this.holidays.clear();
+            snapshot.forEach(doc => {
+                this.holidays.add(doc.data().date);
+            });
+            this.render();
+        } catch (error) {
+            console.error("❌ 공휴일 로드 실패:", error);
+        }
+    }
+
+    setupEventListeners() {
+        // 날짜 클릭 이벤트
+        this.container.addEventListener('click', (e) => {
+            const cell = e.target.closest('.calendar-cell');
+            if (cell && cell.dataset.date) {
+                this.onDateClick(new Date(cell.dataset.date));
+            }
+        });
+
+        // 관리자 기능 이벤트
+        if (isAdmin) {
+            const addButton = document.getElementById('addItemButton');
+            const saveButton = document.getElementById('saveButton');
+            if (addButton) addButton.addEventListener('click', () => this.addItem());
+            if (saveButton) saveButton.addEventListener('click', () => this.saveItems());
+        }
+    }
+
+    isHolidayOrWeekend(date) {
+        const day = date.getDay();
+        const dateStr = this.formatDate(date);
+        return this.holidays.has(dateStr) || day === 0 || day === 6;
+    }
+
+    async calculateProductionDates(baseDate) {
+        try {
+            const result = [];
+            for (const item of this.items) {
+                let count = 0;
+                let tempDate = new Date(baseDate);
+                while (count < item.days) {
+                    tempDate.setDate(tempDate.getDate() + 1);
+                    if (!this.isHolidayOrWeekend(tempDate)) {
+                        count++;
+                    }
+                }
+                result.push({
+                    name: item.name,
+                    date: this.formatDate(tempDate),
+                    color: item.color
+                });
+            }
+            return result;
+        } catch (error) {
+            console.error("❌ 제작일 계산 실패:", error);
+            return [];
+        }
+    }
+
+    async onDateClick(date) {
+        this.selectedDate = date;
+        try {
+            const result = await this.calculateProductionDates(date);
+            
+            // 기존 생성된 이벤트 제거
+            this.events.clear();
+            
+            // 새로운 이벤트 추가
+            result.forEach(item => {
+                if (!this.events.has(item.date)) {
+                    this.events.set(item.date, []);
+                }
+                this.events.get(item.date).push({
+                    title: `[${item.name}] 제작일`,
+                    color: item.color
+                });
+            });
+            
+            this.render();
+        } catch (error) {
+            console.error("❌ 날짜 클릭 처리 실패:", error);
+            alert("일정 생성에 실패했습니다. 다시 시도해주세요.");
+        }
+    }
+
+    formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    addMemo(date, text, color = '#FFFFFF') {
+        const dateStr = this.formatDate(date);
+        this.memos.set(dateStr, { text, color });
+        this.render();
+    }
+
+    render() {
+        const year = this.date.getFullYear();
+        const month = this.date.getMonth();
+        const today = new Date();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+
+        // 달력 그리드 생성
+        let html = `
+            <div class="calendar-header">
+                <button class="prev-month">&lt;</button>
+                <h2>${year}년 ${month + 1}월</h2>
+                <button class="next-month">&gt;</button>
+            </div>
+            <div class="calendar-grid">
+                <div class="weekday">일</div>
+                <div class="weekday">월</div>
+                <div class="weekday">화</div>
+                <div class="weekday">수</div>
+                <div class="weekday">목</div>
+                <div class="weekday">금</div>
+                <div class="weekday">토</div>
+        `;
+
+        // 이전 달의 마지막 날짜들
+        const prevMonthDays = firstDay.getDay();
+        const prevMonth = new Date(year, month, 0);
+        for (let i = prevMonthDays - 1; i >= 0; i--) {
+            const date = new Date(year, month - 1, prevMonth.getDate() - i);
+            const dateStr = this.formatDate(date);
+            html += this.createDateCell(date, dateStr, 'prev-month');
+        }
+
+        // 현재 달의 날짜들
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+            const date = new Date(year, month, i);
+            const dateStr = this.formatDate(date);
+            html += this.createDateCell(date, dateStr, 'current-month');
+        }
+
+        // 다음 달의 시작 날짜들
+        const nextMonthDays = 42 - (prevMonthDays + lastDay.getDate());
+        for (let i = 1; i <= nextMonthDays; i++) {
+            const date = new Date(year, month + 1, i);
+            const dateStr = this.formatDate(date);
+            html += this.createDateCell(date, dateStr, 'next-month');
+        }
+
+        html += '</div>';
+        this.container.innerHTML = html;
+
+        // 이벤트 리스너 추가
+        this.container.querySelector('.prev-month').addEventListener('click', () => this.prevMonth());
+        this.container.querySelector('.next-month').addEventListener('click', () => this.nextMonth());
+    }
+
+    createDateCell(date, dateStr, className) {
+        const isToday = this.formatDate(new Date()) === dateStr;
+        const isSelected = this.formatDate(this.selectedDate) === dateStr;
+        const isHoliday = this.isHolidayOrWeekend(date);
+        const events = this.events.get(dateStr) || [];
+        const memo = this.memos.get(dateStr);
+
+        let cellClass = `calendar-cell ${className}`;
+        if (isToday) cellClass += ' today';
+        if (isSelected) cellClass += ' selected';
+        if (isHoliday) cellClass += ' holiday';
+
+        let html = `<div class="${cellClass}" data-date="${dateStr}">
+            <span class="date">${date.getDate()}</span>`;
+
+        // 이벤트 표시
+        events.forEach(event => {
+            html += `<div class="event" style="background-color: ${event.color}">${event.title}</div>`;
+        });
+
+        // 메모 표시
+        if (memo) {
+            html += `<div class="memo" style="background-color: ${memo.color}">${memo.text}</div>`;
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    prevMonth() {
+        this.date.setMonth(this.date.getMonth() - 1);
+        this.render();
+    }
+
+    nextMonth() {
+        this.date.setMonth(this.date.getMonth() + 1);
+        this.render();
+    }
+
+    // 관리자 기능
+    addItem() {
+        const container = document.getElementById('itemsContainer');
+        if (!container) return;
+
+        const index = container.querySelectorAll('div').length;
+        const itemHtml = `
+            <div>
+                이름: <input id="name_${index}">
+                영업일: <input type="number" id="days_${index}">
+                색상: <input type="color" id="color_${index}" value="#cccccc">
+                <button onclick="calendar.removeItem(null, ${index})">삭제</button>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', itemHtml);
+    }
+
+    async removeItem(id, index) {
+        try {
+            if (id) {
+                await this.itemsCollection.doc(id).delete();
+            } else {
+                const div = document.querySelector(`#itemsContainer div:nth-child(${index + 1})`);
+                if (div) div.remove();
+            }
+        } catch (error) {
+            console.error("❌ 항목 삭제 실패:", error);
+            alert("삭제 실패: " + error.message);
+        }
+    }
+
+    async saveItems() {
+        try {
+            const container = document.getElementById('itemsContainer');
+            if (!container) return;
+
+            const items = [];
+            const divs = container.querySelectorAll('div');
+            
+            for (let i = 0; i < divs.length; i++) {
+                const name = document.getElementById(`name_${i}`).value.trim();
+                const days = parseInt(document.getElementById(`days_${i}`).value);
+                const color = document.getElementById(`color_${i}`).value;
+
+                if (!name) throw new Error("항목 이름을 입력해주세요.");
+                if (isNaN(days) || days <= 0) throw new Error("유효한 영업일을 입력해주세요.");
+
+                items.push({ name, days, color });
+            }
+
+            // 기존 항목 삭제
+            const snapshot = await this.itemsCollection.get();
+            const batch = this.db.batch();
+            snapshot.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+
+            // 새 항목 추가
+            const addBatch = this.db.batch();
+            for (const item of items) {
+                const docRef = this.itemsCollection.doc();
+                addBatch.set(docRef, {
+                    ...item,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            await addBatch.commit();
+
+            alert("저장 완료!");
+            this.loadItems();
+        } catch (error) {
+            console.error("❌ 저장 실패:", error);
+            alert("저장 실패: " + error.message);
+        }
+    }
+}
+
+// DOM이 로드된 후 캘린더 인스턴스 생성
+document.addEventListener('DOMContentLoaded', () => {
+    window.calendar = new Calendar(document.getElementById('calendar'));
+}); 
