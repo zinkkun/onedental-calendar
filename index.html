@@ -223,10 +223,15 @@
   <!-- Firebase 초기화 -->
   <script>
     // Firebase 초기화
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      window.db = firebase.apps[0].firestore();
+      console.log("✅ Firebase 초기화 성공");
+    } catch (error) {
+      console.error("❌ Firebase 초기화 실패:", error);
     }
-    window.db = firebase.firestore();
   </script>
 
   <!-- 메인 스크립트 -->
